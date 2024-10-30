@@ -6,6 +6,11 @@
 
 **Pana Adrian 344C1**
 
+# Requirements
+
+#### OpenCV
+`sudo apt-get install libopencv-dev `
+
 # Description
 
 # Roadmap
