@@ -8,8 +8,16 @@
 
 # Requirements
 
-#### OpenCV
+- #### C++ 17
+
+- #### OpenCV
 `sudo apt-get install libopencv-dev `
+
+# Usage
+Add images to the [images](./images/) folder
+```
+make build
+make run IMAGE=./images/image.jpg THRESHOLD=100
 
 # Description
 
@@ -19,6 +27,12 @@
 Implemented the [sequential version](./sobel_sequential.cpp) of the algorithm as a starting point.
 We used OpenCV for the image extraction and (at first) for the grayscale
 conversion. 
+
+## Week 0.5
+Modified the [sequential version](./sobel_sequential.cpp) to an explicit grayscale conversion.
+Modified [Makefile](./Makefile) and source file, they now take the image path and threshold as
+parameters.
+Also added [input](./images/) and [output](./edges/) folders, with a few examples.
 
 # References
 
