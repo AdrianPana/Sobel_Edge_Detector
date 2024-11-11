@@ -18,6 +18,7 @@ Add images to the [images](./images/) folder
 ```
 make build
 make run IMAGE=./images/image.jpg THRESHOLD=100
+```
 
 # Description
 
