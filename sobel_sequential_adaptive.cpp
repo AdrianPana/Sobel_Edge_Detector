@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
             int red = pixel[0];
             int green = pixel[1];
             int blue = pixel[2];
-            grayscaleImage.at<uchar>(i,j) = (pixel[0] + pixel[1] + pixel[2]) / 3;
+            grayscaleImage.at<uchar>(i,j) = 0.11 * pixel[0] + 0.59 * pixel[1] + 0.3 * pixel[2];
         }
     }
 
