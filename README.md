@@ -11,13 +11,15 @@
 - #### C++ 17
 
 - #### OpenCV
-`sudo apt-get install libopencv-dev `
-
+```
+sudo apt-get install libopencv-dev
+```
 # Usage
 Add images to the [images](./images/) folder
 ```
 make build
 make run IMAGE=./images/image.jpg THRESHOLD=100
+```
 
 # Description
 
