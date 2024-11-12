@@ -39,4 +39,3 @@ Also added [input](./images/) and [output](./edges/) folders, with a few example
 1. https://medium.com/@erhan_arslan/exploring-edge-detection-in-python-2-sobel-edge-detector-a-closer-look-de051a7b56df
 2. https://homepages.inf.ed.ac.uk/rbf/HIPR2/sobel.htm
 3. https://automaticaddison.com/how-the-sobel-operator-works/
-4. https://iopscience.iop.org/article/10.1088/1742-6596/1678/1/012105/pdf
