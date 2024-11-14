@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <iostream>
 #include <cmath>
+#include <time.h>
 
 int main(int argc, char** argv) {
     if (argc != 3) {
@@ -22,6 +23,7 @@ int main(int argc, char** argv) {
         std::cerr << "Could not open or find the image" << std::endl;
         return 1;
     }
+    clock_t start = clock();
 
     int rows = image.rows;
     int cols = image.cols;
@@ -69,11 +71,15 @@ int main(int argc, char** argv) {
             result.at<uchar>(i, j) = (magnitude > THRESHOLD) ? 255 : 0;
         }
     }
+    clock_t end = clock();
 
+
+    double duration = (double)(end - start) / CLOCKS_PER_SEC;
     std::string outputImagePath = dirPath + "/edges/edges_" + imageName;
     cv::imwrite(outputImagePath, result);
 
     std::cout << "Edges image saved as " << outputImagePath << std::endl;
+    std::cout << "Algorithm took: " << duration << std::endl;
 
     return 0;
 }
