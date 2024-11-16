@@ -36,9 +36,13 @@ Modified [Makefile](./Makefile) and source file, they now take the image path an
 parameters.
 Also added [input](./images/) and [output](./edges/) folders, with a few examples.
 
+## Week 1
+Fixed grayscale conversion to weighted average with weights 0.11, 0.59, 0.3 for R,G,B, as stated in [5].
+
 # References
 
 1. https://medium.com/@erhan_arslan/exploring-edge-detection-in-python-2-sobel-edge-detector-a-closer-look-de051a7b56df
 2. https://homepages.inf.ed.ac.uk/rbf/HIPR2/sobel.htm
 3. https://automaticaddison.com/how-the-sobel-operator-works/
 4. https://iopscience.iop.org/article/10.1088/1742-6596/1678/1/012105/pdf
+5. https://gist.github.com/SubhiH/b34e74ffe4fd1aab046bcf62b7f12408
