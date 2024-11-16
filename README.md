@@ -11,17 +11,31 @@
 - #### C++ 17
 
 - #### OpenCV
+
+- #### Valgrind, Kcachegrind
 ```
 sudo apt-get install libopencv-dev
+sudo apt-get install valgrind
+sudo apt-get install kcachegrind
 ```
 # Usage
 Add images to the [images](./images/) folder
 ```
 make build
-make run IMAGE=./images/image.jpg THRESHOLD=100
+make run IMAGE=./images/image.jpg BLUR=true/false
+make profile IMAGE=./images/image.jpg BLUR=true/false
 ```
 
 # Description
+
+This is a project originated from a university assignment meant to show the optimization of 
+an advanced Sobel Edge Detection sequential algorithm through the use of different parallelization
+techniques.
+
+The [images](./images/) folder contains a few examples to play with, the results of the edge detection
+being stored in the [edges](./edges/) folder.
+
+The [BIG](./images/big.jpg) image is used for stress-testing, as it has very large dimensions.
 
 # Roadmap
 
@@ -37,9 +51,28 @@ parameters.
 Also added [input](./images/) and [output](./edges/) folders, with a few examples.
 
 ## Week 1
+
+### Final sequential version updates
 Fixed grayscale conversion to weighted average with weights 0.11, 0.59, 0.3 for R,G,B, as stated in [5].
+
 We added a simple strategy to select an adaptive threshold for each 3x3 pixel window in the image inspired by [4].
+
 We also added the option to blur[6] the image, by applying a blur kernel to the grayscale version, to get rid of anomalies.
+
+### Profiling
+
+Since adding the adaptive threshold, the runtime of the program has risen substantially.
+
+We tested it on a quite large [image](./images/big.jpg) of 3MB (5266x3403 pixels) with the BLUR option added on top, and the result
+was approximately 4 seconds.
+We ran vallgrind on it and used kcachegrind to visualize the [callgrind](./profiling/callgrind.out.21931) results. Here is the Call Map:
+
+![callMap](./profiling/callMap.png)
+
+As expected the Sobel Operator and the Adaptive Threshold computations take up most of the resources. These will be the focal point of the
+optimization through parallelism. We will also include the grayscale and blur transformations to shave of some extra time.
+
+
 
 # References
 

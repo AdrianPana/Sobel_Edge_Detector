@@ -6,5 +6,8 @@ build:
 run:
 	./sobel_sequential $(IMAGE) $(BLUR) 
 
+profile:
+	valgrind --tool=callgrind ./sobel_sequential $(IMAGE) $(BLUR) 
+
 clean:
 	rm sobel_sequential
