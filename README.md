@@ -38,6 +38,8 @@ Also added [input](./images/) and [output](./edges/) folders, with a few example
 
 ## Week 1
 Fixed grayscale conversion to weighted average with weights 0.11, 0.59, 0.3 for R,G,B, as stated in [5].
+We added a simple strategy to select an adaptive threshold for each 3x3 pixel window in the image inspired by [4].
+We also added the option to blur[6] the image, by applying a blur kernel to the grayscale version, to get rid of anomalies.
 
 # References
 
@@ -46,3 +48,4 @@ Fixed grayscale conversion to weighted average with weights 0.11, 0.59, 0.3 for 
 3. https://automaticaddison.com/how-the-sobel-operator-works/
 4. https://iopscience.iop.org/article/10.1088/1742-6596/1678/1/012105/pdf
 5. https://gist.github.com/SubhiH/b34e74ffe4fd1aab046bcf62b7f12408
+6. https://www.youtube.com/watch?v=VL8PuOPjVjY&t=1s
