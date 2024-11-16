@@ -25,7 +25,12 @@ make build
 make run IMAGE=./images/image.jpg BLUR=true/false
 make profile IMAGE=./images/image.jpg BLUR=true/false
 ```
+Find the result in the [edges](./edges/) folder
 
+For profiling, use 
+```
+kcachegrind callgrind.out
+```
 # Description
 
 This is a project originated from a university assignment meant to show the optimization of 
@@ -69,7 +74,7 @@ We ran vallgrind on it and used kcachegrind to visualize the [callgrind](./profi
 
 ![callMap](./profiling/callMap.png)
 
-As expected the Sobel Operator and the Adaptive Threshold computations take up most of the resources. These will be the focal point of the
+As expected, the Sobel Operator and the Adaptive Threshold computations take up most of the resources. These will be the focal point of the
 optimization through parallelism. We will also include the grayscale and blur transformations to shave of some extra time.
 
 
