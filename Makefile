@@ -1,7 +1,7 @@
 BLUR=true
 
 build:
-	g++ -o sobel_sequential sobel_sequential.cpp `pkg-config --cflags --libs opencv4` -lm
+	g++ -o sobel_sequential sobel_sequential_video.cpp `pkg-config --cflags --libs opencv4` -lm
 
 run:
 	./sobel_sequential $(IMAGE) $(BLUR) 
