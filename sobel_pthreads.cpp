@@ -3,25 +3,23 @@
 #include <iostream>
 #include <cmath>
 #include <time.h>
+#include <vector>
+#include <pthread.h>
 
 #define P 8
 
-typedef struct param
+std::vector<cv::Mat> frames;
+cv::VideoWriter writers[P];
+bool BLUR;
+
+cv::Mat applyGrayscale(cv::Mat sourceImage)
 {
-    cv::Mat mat;
-    int id;
-} param_t;
+    cv::Mat grayscaleImage = cv::Mat::zeros(sourceImage.size(), CV_8UC1);
 
-cv::Mat grayscaleImage = cv::Mat::zeros(sourceImage.size(), CV_8UC1);
+    int rows = sourceImage.rows;
+    int cols = sourceImage.cols;
 
-void *applyGrayscale(void *args)
-{
-    cv::Mat mat = ((param_t *)args)->mat;
-    int id = ((param_t *)args)->id;
-    int start = id * (double)mat.rows / P;
-    int end = std::min((id + 1) * (double)mat.rows / P, mat.rows);
-
-    for (int i = start; i < end; ++i)
+    for (int i = 0; i < rows; ++i)
     {
         for (int j = 0; j < cols; ++j)
         {
@@ -32,6 +30,8 @@ void *applyGrayscale(void *args)
             grayscaleImage.at<uchar>(i, j) = 0.11 * pixel[0] + 0.59 * pixel[1] + 0.3 * pixel[2];
         }
     }
+
+    return grayscaleImage;
 }
 
 cv::Mat blurImage(cv::Mat sourceImage)
@@ -153,54 +153,129 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
     return result;
 }
 
+void *processFrame(void *args)
+{
+    int tid = *((int *)args);
+    int start = tid * (double)frames.size() / P;
+    int end = std::min((tid + 1) * (double)frames.size() / P, (double)frames.size());
+
+    for (int i = start; i < end; i++)
+    {
+        cv::Mat frame = frames.at(i);
+        cv::Mat grayscaleImage = cv::Mat::zeros(frame.size(), CV_8UC1);
+        cv::Mat sobelImage = cv::Mat::zeros(frame.size(), CV_8UC1);
+        cv::Mat result = cv::Mat::zeros(frame.size(), CV_8UC1);
+
+        grayscaleImage = applyGrayscale(frame);
+
+        if (BLUR)
+        {
+            sobelImage = blurImage(grayscaleImage);
+        }
+        else
+        {
+            sobelImage = grayscaleImage;
+        }
+
+        result = applySobelOperator(sobelImage);
+
+        frames.at(i) = result;
+        writers[tid].write(result);
+    }
+
+    return NULL;
+}
+
+#include <time.h>
 int main(int argc, char **argv)
 {
     if (argc != 3)
     {
-        std::cerr << "Usage: make run IMAGE=<image_path> BLUR=true" << std::endl;
+        std::cerr << "Usage: make run IMAGE=<video_path> BLUR=<true/false>" << std::endl;
         return 1;
     }
 
-    std::string imagePath = argv[1];
-    std::filesystem::path fs_path(imagePath);
-    std::string imageName = fs_path.filename().string();
+    std::string videoPath = argv[1];
+    std::filesystem::path fs_path(videoPath);
+    std::string videoName = fs_path.filename().string();
     std::string dirPath = fs_path.parent_path().parent_path().string();
+    std::string outputVideoPath = dirPath + "/edges/edges_" + videoName;
 
     std::string blur = argv[2];
-    bool BLUR = blur == "true";
+    BLUR = blur == "true";
 
-    cv::Mat image = cv::imread(imagePath);
+    cv::VideoCapture vidCapture(videoPath);
 
-    if (image.empty())
+    if (!vidCapture.isOpened())
     {
-        std::cerr << "Could not open or find the image" << std::endl;
+        std::cerr << "Error opening video stream or file" << std::endl;
         return 1;
     }
 
-    cv::Mat sobelImage = cv::Mat::zeros(image.size(), CV_8UC1);
-    cv::Mat result = cv::Mat::zeros(image.size(), CV_8UC1);
+    int frameWidth = vidCapture.get(cv::CAP_PROP_FRAME_WIDTH);
+    int frameHeight = vidCapture.get(cv::CAP_PROP_FRAME_HEIGHT);
+    int frameRate = vidCapture.get(cv::CAP_PROP_FPS);
+    int ex = static_cast<int>(vidCapture.get(cv::CAP_PROP_FOURCC));
+    for (int i = 0; i < P; i++)
+    {
+        int pointIndex = outputVideoPath.find_last_of(".");
+        std::string outputVideoPathName = outputVideoPath.substr(0, pointIndex);
+        std::string outputVideoPathExtension = outputVideoPath.substr(pointIndex);
+        std::cout << outputVideoPathName + std::to_string(i) + outputVideoPathExtension << std::endl;
+        writers[i] = cv::VideoWriter(outputVideoPathName + std::to_string(i) + outputVideoPathExtension, ex, frameRate, cv::Size(frameWidth, frameHeight), false);
+    }
 
     clock_t start = clock();
-    applyGrayscale(image);
-
-    if (BLUR)
+    while (true)
     {
-        sobelImage = blurImage(grayscaleImage);
+        cv::Mat frame;
+
+        bool frameResult = vidCapture.read(frame);
+        if (!frameResult)
+        {
+            break;
+        }
+
+        if (frame.empty())
+        {
+            std::cerr << "Could not open or find the image" << std::endl;
+            return 1;
+        }
+
+        frames.push_back(frame);
     }
-    else
+
+    pthread_t threads[P];
+    int args[P];
+    for (int i = 0; i < P; i++)
     {
-        sobelImage = grayscaleImage;
+        args[i] = i;
+        int res = pthread_create(&threads[i], NULL, processFrame, &args[i]);
+        if (res)
+        {
+            std::cerr << "Error while creating thread with id: " << std::to_string(i) << std::endl;
+            return 1;
+        }
     }
 
-    result = applySobelOperator(sobelImage);
-
+    for (int i = 0; i < P; i++)
+    {
+        int res = pthread_join(threads[i], NULL);
+        if (res)
+        {
+            std::cerr << "Error while joining thread with id: " << std::to_string(i) << std::endl;
+            return 1;
+        }
+    }
     clock_t end = clock();
     double durationSeconds = (double)(end - start) / CLOCKS_PER_SEC;
 
-    std::string outputImagePath = dirPath + "/edges/edges_" + imageName;
-    cv::imwrite(outputImagePath, result);
-
-    std::cout << "Edges image saved as " << outputImagePath << std::endl;
+    std::cout << "Edges image saved as " << outputVideoPath << std::endl;
     std::cout << "Algorithm took: " << durationSeconds * 1000 << "ms";
-    return 0;
+
+    vidCapture.release();
+    for (int i = 0; i < P; i++)
+    {
+        writers[i].release();
+    }
 }
