@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <time.h>
+#include <vector>
 
 cv::Mat applyGrayscale(cv::Mat sourceImage)
 {
@@ -145,6 +146,28 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
     return result;
 }
 
+void processFrame(cv::Mat frame, bool BLUR, cv::VideoWriter writer)
+{
+    cv::Mat grayscaleImage = cv::Mat::zeros(frame.size(), CV_8UC1);
+    cv::Mat sobelImage = cv::Mat::zeros(frame.size(), CV_8UC1);
+    cv::Mat result = cv::Mat::zeros(frame.size(), CV_8UC1);
+
+    grayscaleImage = applyGrayscale(frame);
+
+    if (BLUR)
+    {
+        sobelImage = blurImage(grayscaleImage);
+    }
+    else
+    {
+        sobelImage = grayscaleImage;
+    }
+
+    result = applySobelOperator(sobelImage);
+
+    writer.write(result);
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 3)
@@ -179,7 +202,7 @@ int main(int argc, char **argv)
     writer = cv::VideoWriter(outputVideoPath, ex, frameRate, cv::Size(frameWidth, frameHeight), false);
 
     clock_t start = clock();
-    int i = 0;
+    std::vector<cv::Mat> frames;
     while (true)
     {
         cv::Mat frame;
@@ -195,34 +218,13 @@ int main(int argc, char **argv)
             std::cerr << "Could not open or find the image" << std::endl;
             return 1;
         }
-    
-        cv::Mat grayscaleImage = cv::Mat::zeros(frame.size(), CV_8UC1);
-        cv::Mat sobelImage = cv::Mat::zeros(frame.size(), CV_8UC1);
-        cv::Mat result = cv::Mat::zeros(frame.size(), CV_8UC1);
 
-        grayscaleImage = applyGrayscale(frame);
+        frames.push_back(frame);
+    }
 
-        if (BLUR)
-        {
-            sobelImage = blurImage(grayscaleImage);
-        }
-        else
-        {
-            sobelImage = grayscaleImage;
-        }
-
-        result = applySobelOperator(sobelImage);
-
-        writer.write(result);
-
-        size_t lastindex = videoName.find_last_of(".");
-        std::string rawName = videoName.substr(0, lastindex);
-        std::string extension = videoName.substr(lastindex + 1);
-
-        std::string outputImagePath = dirPath + "/edges/edges_" + rawName + std::to_string(i) + ".jpeg";
-        // std::cout << outputImagePath << std::endl;
-        // cv::imwrite(outputImagePath, result);
-        i++;
+    for (cv::Mat frame : frames)
+    {
+        processFrame(frame, BLUR, writer);
     }
     clock_t end = clock();
     double durationSeconds = (double)(end - start) / CLOCKS_PER_SEC;
