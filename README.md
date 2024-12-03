@@ -64,20 +64,48 @@ We added a simple strategy to select an adaptive threshold for each 3x3 pixel wi
 
 We also added the option to blur[6] the image, by applying a blur kernel to the grayscale version, to get rid of anomalies.
 
-### Profiling
+## Week 2
+We enhanced the algorithm to take as an input a video and output the video where we detected the edges for each frame 
+and streamed it to the result.
 
-Since adding the adaptive threshold, the runtime of the program has risen substantially.
+## Week 3
+We started with the intuitive pthread implementation and profiling. Our approach
+was to run in parallel on as many threads as the machine has CPUs the main work
+of processing one frame. Basically we tried to process a part of the video in 
+parallel and then bring all the parts toghether.
 
-We tested it on a quite large [image](./images/big.jpg) of 3MB (5266x3403 pixels) with the BLUR option added on top, and the result
-was approximately 4 seconds.
-We ran vallgrind on it and used kcachegrind to visualize the [callgrind](./profiling/callgrind.out.21931) results. Here is the Call Map:
+This way we manage to have around 2.41 speedup.
 
-![callMap](./profiling/callMap.png)
+# Profiling
+## Sequential Version
 
-As expected, the Sobel Operator and the Adaptive Threshold computations take up most of the resources. These will be the focal point of the
-optimization through parallelism. We will also include the grayscale and blur transformations to shave of some extra time.
+![graphic](./docs/profiling_sequential_graphic.png)
 
+The initial result took over 24s for a 6s long video. As you can see from the 
+screenshot above only 16% of the CPUs were used by this version(1.325 logical CPUs 
+out of 8 cores available). Under the hood the OpenCV already does some work on
+multiple threads(reading and writing the video file in general).
 
+We identified some hotspots for our application as we described in the table below.
+
+| No.| Function name         | Usage |
+|----|-----------------------|-------|
+| 1  | processFrame          | 73.6% |
+| 2  | applySobelOperator    | 45%   |
+| 4  | getAdaptiveThresshold | 17%   |
+| 3  | blurImage             | 15.6% |
+| 4  | Mat.at                | 12.3% |
+| 5  | applyGrayscale        | 11.2% |       
+
+We will be focusing our attention on the main processing function and the function
+that applies the Sobel operator as the are the ones that take the most out of
+our computation workload.
+
+As we can further identify any speedup we will try to run in parallel the other functions too.
+
+## Pthread Version
+### Initial approach
+![graphic1](./docs/profiling_pthreads_graphic1.png)
 
 # References
 
