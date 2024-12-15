@@ -5,12 +5,23 @@
 #include <time.h>
 #include <vector>
 #include <pthread.h>
+#include <fstream>
 
 #define P 8
+#define N 1
 
 std::vector<cv::Mat> frames;
 cv::VideoWriter writers[P];
 bool BLUR;
+std::ofstream demux;
+std::string outputPaths[P];
+
+typedef struct args
+{
+    cv::Mat sourceImage;
+    cv::Mat *result;
+    int tid;
+} args_t;
 
 cv::Mat applyGrayscale(cv::Mat sourceImage)
 {
@@ -106,9 +117,22 @@ int getAdaptiveThreshold(int r[3][3])
     return m[1];
 }
 
-cv::Mat applySobelOperator(cv::Mat sourceImage)
+/**
+ * Impartim workload-ul de aici pe mai multe thread-uri
+ * asta primeste toata matricea si (nr_linii-2/nr_thread-uri) + 2 linii
+ * pe care sa aplice sobel operator-ul si sa le scrie in paralel
+ */
+void *applySobelOperator(void *varg)
 {
-    cv::Mat result = cv::Mat::zeros(sourceImage.size(), CV_8UC1);
+    args_t arg = *(args_t *)varg;
+    cv::Mat sourceImage = arg.sourceImage;
+    cv::Mat *result = arg.result;
+    int tid = arg.tid;
+    int start = (tid * (double)sourceImage.size().height / (N + 1)) + 1;
+    int end = std::min(((tid + 1) * ((double)sourceImage.size().height) / (N + 1)) - 1, (double)sourceImage.size().height - 1);
+
+    // std::cout << tid << ": " << (double)sourceImage.size().height << " " << N + 1 << std::endl;
+    // std::cout << tid << ": " << start << " " << end << std::endl;
 
     int Gx[3][3] = {
         {1, 0, -1},
@@ -124,7 +148,7 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
     int rows = sourceImage.rows;
     int cols = sourceImage.cols;
 
-    for (int i = 1; i < rows - 1; ++i)
+    for (int i = start; i < end; ++i)
     {
         for (int j = 1; j < cols - 1; ++j)
         {
@@ -147,10 +171,10 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
 
             float magnitude = std::sqrt(cx * cx + cy * cy);
 
-            result.at<uchar>(i, j) = (magnitude > threshold) ? 255 : 0;
+            result->at<uchar>(i, j) = (magnitude > threshold) ? 255 : 0;
         }
     }
-    return result;
+    return NULL;
 }
 
 void *processFrame(void *args)
@@ -177,7 +201,37 @@ void *processFrame(void *args)
             sobelImage = grayscaleImage;
         }
 
-        result = applySobelOperator(sobelImage);
+        pthread_t threads[N + 1];
+        args_t args_sobel[N + 1];
+        for (int j = 1; j <= N; j++)
+        {
+            args_t arg;
+            arg.sourceImage = sobelImage;
+            arg.result = &result;
+            arg.tid = j;
+            args_sobel[j] = arg;
+
+            int res = pthread_create(&threads[j], NULL, applySobelOperator, &args_sobel[j]);
+            if (res)
+            {
+                std::cerr << "Error while creating thread with id: " << std::to_string(j) << std::endl;
+            }
+        }
+
+        args_t arg;
+        arg.sourceImage = sobelImage;
+        arg.result = &result;
+        arg.tid = 0;
+        applySobelOperator(&arg);
+
+        for (int j = 1; j <= N; j++)
+        {
+            int res = pthread_join(threads[j], NULL);
+            if (res)
+            {
+                std::cerr << "Error while joining thread with id: " << std::to_string(j) << std::endl;
+            }
+        }
 
         frames.at(i) = result;
         writers[tid].write(result);
@@ -200,6 +254,7 @@ int main(int argc, char **argv)
     std::string videoName = fs_path.filename().string();
     std::string dirPath = fs_path.parent_path().parent_path().string();
     std::string outputVideoPath = dirPath + "/edges/edges_" + videoName;
+    demux.open("./edges/videos.txt");
 
     std::string blur = argv[2];
     BLUR = blur == "true";
@@ -221,11 +276,13 @@ int main(int argc, char **argv)
         int pointIndex = outputVideoPath.find_last_of(".");
         std::string outputVideoPathName = outputVideoPath.substr(0, pointIndex);
         std::string outputVideoPathExtension = outputVideoPath.substr(pointIndex);
-        std::cout << outputVideoPathName + std::to_string(i) + outputVideoPathExtension << std::endl;
-        writers[i] = cv::VideoWriter(outputVideoPathName + std::to_string(i) + outputVideoPathExtension, ex, frameRate, cv::Size(frameWidth, frameHeight), false);
+        outputPaths[i] = outputVideoPathName + std::to_string(i) + outputVideoPathExtension;
+        std::cout << outputPaths[i] << std::endl;
+        writers[i] = cv::VideoWriter(outputPaths[i], ex, frameRate, cv::Size(frameWidth, frameHeight), false);
+        int slashIndex = outputPaths[i].find_last_of("/");
+        demux << "file " << outputPaths[i].substr(slashIndex + 1) << std::endl;
     }
 
-    clock_t start = clock();
     while (true)
     {
         cv::Mat frame;
@@ -267,15 +324,15 @@ int main(int argc, char **argv)
             return 1;
         }
     }
-    clock_t end = clock();
-    double durationSeconds = (double)(end - start) / CLOCKS_PER_SEC;
-
-    std::cout << "Edges image saved as " << outputVideoPath << std::endl;
-    std::cout << "Algorithm took: " << durationSeconds * 1000 << "ms";
 
     vidCapture.release();
     for (int i = 0; i < P; i++)
     {
         writers[i].release();
     }
+
+    system("ffmpeg -f concat -safe 0 -i edges/videos.txt -fflags +genpts edges/merged.mp4");
+    std::cout << "Edges image saved as " << outputVideoPath << std::endl;
+
+    demux.close();
 }
