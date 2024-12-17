@@ -69,13 +69,13 @@ We enhanced the algorithm to take as an input a video and output the video where
 and streamed it to the result.
 
 ## Week 3
-We started work on the intuitive pthreads implementation and profiling. 
+We started work on the intuitive [pthreads](./sobel_pthreads.cpp) implementation and profiling. 
 
 ## Approach
 Our approach was to run the filtering in parallel on a number of threads equal to the machine's CPUs, by splitting the video in multiple batches
 that can be processed at the same time, since the main work is done by applying the operations individually on each frame.
 of processing one frame. 
-After all the batches are processed, we link them back together into a bigger video
+After all the batches are processed, we link them back together into a bigger video.
 
 This way we managed to achieve a speedup of around 2.41.
 
