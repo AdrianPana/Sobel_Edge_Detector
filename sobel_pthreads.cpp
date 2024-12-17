@@ -5,12 +5,15 @@
 #include <time.h>
 #include <vector>
 #include <pthread.h>
+#include <fstream>
 
 #define P 8
 
 std::vector<cv::Mat> frames;
 cv::VideoWriter writers[P];
 bool BLUR;
+std::ofstream demux;
+std::string outputPaths[P];
 
 cv::Mat applyGrayscale(cv::Mat sourceImage)
 {
@@ -200,6 +203,7 @@ int main(int argc, char **argv)
     std::string videoName = fs_path.filename().string();
     std::string dirPath = fs_path.parent_path().parent_path().string();
     std::string outputVideoPath = dirPath + "/edges/edges_" + videoName;
+    demux.open("./edges/videos.txt");
 
     std::string blur = argv[2];
     BLUR = blur == "true";
@@ -221,8 +225,12 @@ int main(int argc, char **argv)
         int pointIndex = outputVideoPath.find_last_of(".");
         std::string outputVideoPathName = outputVideoPath.substr(0, pointIndex);
         std::string outputVideoPathExtension = outputVideoPath.substr(pointIndex);
-        std::cout << outputVideoPathName + std::to_string(i) + outputVideoPathExtension << std::endl;
+        outputPaths[i] = outputVideoPathName + std::to_string(i) + outputVideoPathExtension;
+        std::cout << outputPaths[i] << std::endl;
+
         writers[i] = cv::VideoWriter(outputVideoPathName + std::to_string(i) + outputVideoPathExtension, ex, frameRate, cv::Size(frameWidth, frameHeight), false);
+        int slashIndex = outputPaths[i].find_last_of("/");
+        demux << "file " << outputPaths[i].substr(slashIndex + 1) << std::endl;
     }
 
     clock_t start = clock();
@@ -278,4 +286,9 @@ int main(int argc, char **argv)
     {
         writers[i].release();
     }
+
+    system("ffmpeg -f concat -safe 0 -i edges/videos.txt -fflags +genpts edges/merged.mp4");
+    std::cout << "Edges image saved as " << outputVideoPath << std::endl;
+
+    demux.close();
 }
