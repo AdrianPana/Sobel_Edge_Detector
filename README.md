@@ -69,12 +69,24 @@ We enhanced the algorithm to take as an input a video and output the video where
 and streamed it to the result.
 
 ## Week 3
-We started with the intuitive pthread implementation and profiling. Our approach
-was to run in parallel on as many threads as the machine has CPUs the main work
-of processing one frame. Basically we tried to process a part of the video in 
-parallel and then bring all the parts toghether.
+We started work on the intuitive pthreads implementation and profiling. 
 
-This way we manage to have around 2.41 speedup.
+## Approach
+Our approach was to run the filtering in parallel on a number of threads equal to the machine's CPUs, by splitting the video in multiple batches
+that can be processed at the same time, since the main work is done by applying the operations individually on each frame.
+of processing one frame. 
+After all the batches are processed, we link them back together into a bigger video
+
+This way we managed to achieve a speedup of around 2.41.
+
+## Week 4
+- Implemented a [pthreads version](./sobel_pthreads.cpp) that also processes applying the sobel operator on a single frame in parallel.
+- Implemented 2 MPI versions, [one](./sobel_mpi.cpp) that splits frame batches between processes, and [one](./sobel_mpi_extra.cpp) that, similarly to
+the pthreads implementation, splits each frame between more processes.
+
+## Week 5
+- FFMPEG usage to link resulted videos back together.
+- OpenMP implementation 
 
 # Profiling
 ## Sequential Version
