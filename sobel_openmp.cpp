@@ -127,6 +127,8 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
     int rows = sourceImage.rows;
     int cols = sourceImage.cols;
 
+#pragma omp parallel for shared(result) schedule(dynamic)
+
     for (int i = 1; i < rows - 1; ++i)
     {
         for (int j = 1; j < cols - 1; ++j)
