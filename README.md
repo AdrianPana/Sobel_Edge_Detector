@@ -88,7 +88,7 @@ the pthreads implementation, splits each frame between more processes.
 - FFMPEG usage to link resulted videos back together.
 - OpenMP implementation 
 
-# Profiling
+# Implementation + Profiling
 ## Sequential Version
 
 ![graphic](./docs/profiling_sequential_graphic.png)
@@ -117,7 +117,68 @@ As we can further identify any speedup we will try to run in parallel the other 
 
 ## Pthread Version
 ### Initial approach
+
+As seen before the main chunk of work that our program is doing in the sequential implementation is to process the 
+frame because this part applies on the image multiple algorithms.
+So naturally the first thing we did for the Pthread implementation was to create multiple thread, each one processing a batch
+of frames from the total pool, this way we can do more frames in parallel.
+
+But then we encountered an interesting problem. OpenCV has the ability to create a VideoWriter objects, that works as a C++ stream.
+We can output the data through that stream to a specific file created by the program. The only problem is that the VideoWriter 
+needs to write the frames in order otherwise it will crash. With multiple frames processed that computed the final result this cannot 
+be achived very easy. We took into consideration multiple solutions like a simple buffer to store the frames in order and then
+iterate over it an write to the output file, but this is very expensive as the videos are growing bigger.
+
+In the end we decided that each thread will write to a separate file and then we will concatenate them using FFmpeg.
+This way we can offload some of the work to ffmpeg to be optimised. The downside is that FFmpeg hides the concatantion
+logic so we cannot optimise it by running it in parallel.
+
 ![graphic1](./docs/profiling_pthreads_graphic1.png)
+
+### Second implementation
+The natural thing to do was to take the next function that consumes most of the program which is the function that applies
+the Sobel operator in the greyscaled image. The way we did it is to spawn other N threads from the thread we already created.
+This way we will use N + 1 threads because the master thread that created the other threads will try itself to run the function.
+Now we just need to split the image rows in N+1 segments and process it in parallel.
+
+The total number of threads used should optimally be close to the number of cores that the system is using, but we managed to see
+good results with even more threads. 
+
+## OpenMP Version
+The OpenMP solution is quite similar to the Pthreads one in the sense that both solution split the video in equal size 
+segments to be processed in parallel. Then we split each frame's rows in multiple parts. The implementation is based mostly 
+on the `parallel for` preprocessor instruction which will split the for iteration on multiple threads and then join them after 
+everything is done. 
+
+One optimisation that we've done is to use the dynamic scheduling for the thread that applies the Sobel operator. We couldn't 
+do it for for the function that process a segment of the frames because it needs to write the frames in order to the writer and
+we saw that sometimes due to each frame being simpler or more complex it usually did write a frame ahead of the one that was 
+supposed to be written. But for the function that applies the Sobel operator we don't have that restriction as the function 
+takes a frame and returns back the computed matrix. And this works great as some regions of the image may be denser and 
+may require harder computations by a some threads.
+
+## MPI Version
+### Initial Approach
+As we did for the previous solutions we started from something simpler and then moved forward to 
+a better approach. We started by processing each frame on multiple MPI processes. The ROOT process
+would start by assinging each process a segment of the video by sending to them the starting frame
+and the ending frame indexes. Then each process would read its part from the video and process it.
+At the end each process would produce a different video and the ROOT process would merge it into a single output.
+
+### Final result
+The second solution implies the further splitting of each frame on multiple processes.
+Something like the Pthreads solution we made the difference between 2 types of processes:
+  - Master: That would read a parat of the video and send over to the slaves
+  - Workers: that would apply the Sobel operator on a part of the frame
+We would define a RATIO macro that would tell us the ratio of master/worker processes. If we have
+16 processes assigned and we have a ratio of 4 then we will have 4 master processes and each
+master would have 4 workers.
+Then the algorithm works as explained above: 
+  - Each master would read the assinged segment and share it with the workers
+  - Each worker would process a part of the frame and send back to the master
+  - The master would write to the output the final frame
+  - At the end the ROOT process would use ffmpeg to concatenate the result
+
 
 # References
 

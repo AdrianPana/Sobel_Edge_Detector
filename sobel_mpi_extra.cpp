@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #include <time.h>
 #include <vector>
@@ -12,34 +13,39 @@
 #define RATIO 4
 // #define MASTERS 4
 
-int* matToIntArray(const cv::Mat& mat, int& arraySize) {
+int *matToIntArray(const cv::Mat &mat, int &arraySize)
+{
     arraySize = mat.total();
 
-    int* data = new int[arraySize];
+    int *data = new int[arraySize];
 
     int index = 0;
-    for (int i = 0; i < mat.rows; ++i) {
-        for (int j = 0; j < mat.cols; ++j) {
-            data[index++] = mat.at<uchar>(i,j);
+    for (int i = 0; i < mat.rows; ++i)
+    {
+        for (int j = 0; j < mat.cols; ++j)
+        {
+            data[index++] = mat.at<uchar>(i, j);
         }
     }
 
     return data;
 }
 
-cv::Mat intArrayToMat(const int* data, int arraySize, int rows, int cols, int type) {
+cv::Mat intArrayToMat(const int *data, int arraySize, int rows, int cols, int type)
+{
     cv::Mat mat(rows, cols, type);
 
     int index = 0;
-    for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-            mat.at<uchar>(i,j) = data[index++];
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = 0; j < cols; ++j)
+        {
+            mat.at<uchar>(i, j) = data[index++];
         }
     }
 
     return mat;
 }
-
 
 cv::Mat applyGrayscale(cv::Mat sourceImage)
 {
@@ -148,7 +154,7 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
         {1, 2, 1},
         {0, 0, 0},
         {-1, -2, -1}};
-    
+
     int r[3][3];
     int rows = sourceImage.rows;
     int cols = sourceImage.cols;
@@ -210,38 +216,41 @@ void processFrame(int rank, int proc, cv::Mat frame, bool BLUR, cv::VideoWriter 
     r1 = applySobelOperator(r1);
 
     int idx = 1;
-    for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave) {
+    for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave)
+    {
         int end = rows_per_slave * (idx + 1);
-        if (slave == masters + slaves_per_master * (rank + 1) - 1) {
+        if (slave == masters + slaves_per_master * (rank + 1) - 1)
+        {
             end = sobelImage.rows;
         }
         cv::Mat r2 = sobelImage(cv::Range(rows_per_slave * idx, end), cv::Range::all());
 
         idx++;
         int r2size;
-        int* r2send = matToIntArray(r2, r2size);
-        MPI_Send(&r2size, 1, MPI_INT, slave, 1 , MPI_COMM_WORLD);
+        int *r2send = matToIntArray(r2, r2size);
+        MPI_Send(&r2size, 1, MPI_INT, slave, 1, MPI_COMM_WORLD);
         MPI_Send(r2send, r2size, MPI_INT, slave, 1, MPI_COMM_WORLD);
         delete[] r2send;
     }
 
-    
-    for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave) {
+    for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave)
+    {
 
         int rows = rows_per_slave;
-        if (slave == masters + slaves_per_master * (rank + 1) - 1) {
+        if (slave == masters + slaves_per_master * (rank + 1) - 1)
+        {
             rows = sobelImage.rows - (RATIO - 1) * rows_per_slave;
         }
 
         // std::cout << rank << " " << slave << std::endl;
         int r2size;
-        MPI_Recv(&r2size, 1, MPI_INT, slave, 1 , MPI_COMM_WORLD, &status);
-        int* r2send = new int[r2size];
+        MPI_Recv(&r2size, 1, MPI_INT, slave, 1, MPI_COMM_WORLD, &status);
+        int *r2send = new int[r2size];
         MPI_Recv(r2send, r2size, MPI_INT, slave, 1, MPI_COMM_WORLD, &status);
         r2 = intArrayToMat(r2send, r2size, rows, sobelImage.cols, CV_8UC1);
         delete[] r2send;
         cv::vconcat(r1, r2, r1);
-    }    
+    }
     writer.write(r1);
 }
 
@@ -257,7 +266,7 @@ int main(int argc, char **argv)
     }
 
     MPI_Init(&argc, &argv);
- 
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &proc);
     int masters = proc / RATIO;
@@ -268,10 +277,10 @@ int main(int argc, char **argv)
     std::string videoName = fs_path.filename().string();
     std::string dirPath = fs_path.parent_path().parent_path().string();
     std::string outputVideoPath = dirPath + "/edges/edges_" + std::to_string(rank) + "_" + videoName;
+    std::ofstream demux;
 
     std::string blur = argv[2];
     bool BLUR = blur == "true";
-
 
     cv::VideoCapture vidCapture(videoPath);
     cv::VideoWriter writer;
@@ -287,11 +296,20 @@ int main(int argc, char **argv)
     }
 
     clock_t start_t;
-    if (rank == ROOT) {
+    if (rank == ROOT)
+    {
         start_t = clock();
+        demux.open(dirPath + "/edges/videos.txt");
+        for (int i = 0; i < masters; i++)
+        {
+            std::string temp = dirPath + "/edges/edges_" + std::to_string(i) + "_" + videoName;
+            int slashIndex = temp.find_last_of("/");
+            demux << "file " << temp.substr(slashIndex + 1) << std::endl;
+        }
     }
 
-    if (rank < masters) {
+    if (rank < masters)
+    {
         frameWidth = vidCapture.get(cv::CAP_PROP_FRAME_WIDTH);
         frameHeight = vidCapture.get(cv::CAP_PROP_FRAME_HEIGHT);
         frameRate = vidCapture.get(cv::CAP_PROP_FPS);
@@ -318,12 +336,14 @@ int main(int argc, char **argv)
             frames.push_back(frame);
         }
 
-        if (rank == ROOT) {
+        if (rank == ROOT)
+        {
             int len_frames = frames.size();
 
-            for (int i = 0; i < masters; ++i) {
+            for (int i = 0; i < masters; ++i)
+            {
                 start = i * (double)len_frames / masters;
-                end = std::min((i + 1) * (double)len_frames / masters, (double)len_frames);    
+                end = std::min((i + 1) * (double)len_frames / masters, (double)len_frames);
 
                 MPI_Send(&start, 1, MPI_LONG_LONG, i, 0, MPI_COMM_WORLD);
                 MPI_Send(&end, 1, MPI_LONG_LONG, i, 0, MPI_COMM_WORLD);
@@ -337,43 +357,49 @@ int main(int argc, char **argv)
         int cols = frames[0].cols;
         int send_rows = frames[0].rows / RATIO;
 
-        for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave) {
+        for (int slave = masters + slaves_per_master * rank; slave < masters + slaves_per_master * (rank + 1); ++slave)
+        {
             MPI_Send(&my_frames, 1, MPI_INT, slave, 1, MPI_COMM_WORLD);
             MPI_Send(&cols, 1, MPI_INT, slave, 1, MPI_COMM_WORLD);
-            if (slave == masters + slaves_per_master * (rank + 1) - 1) {
+            if (slave == masters + slaves_per_master * (rank + 1) - 1)
+            {
                 send_rows = frames[0].rows - (RATIO - 1) * send_rows;
             }
             MPI_Send(&send_rows, 1, MPI_INT, slave, 1, MPI_COMM_WORLD);
         }
 
-        for (long long i = start; i < end; ++i) {
+        for (long long i = start; i < end; ++i)
+        {
             processFrame(rank, proc, frames[i], BLUR, writer);
-        }    
+        }
     }
-    else {
+    else
+    {
         int my_frames, rows, cols;
         MPI_Recv(&my_frames, 1, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(&cols, 1, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD, &status);
         MPI_Recv(&rows, 1, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD, &status);
-        for (int i = 0; i < my_frames; ++i) {
+        for (int i = 0; i < my_frames; ++i)
+        {
             int r2size;
             MPI_Status status;
-            
-            MPI_Recv(&r2size, 1, MPI_INT, (rank - masters) / slaves_per_master, 1 , MPI_COMM_WORLD, &status);
-            int* r2send = new int[r2size];
+
+            MPI_Recv(&r2size, 1, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD, &status);
+            int *r2send = new int[r2size];
             MPI_Recv(r2send, r2size, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD, &status);
 
             cv::Mat r2 = intArrayToMat(r2send, r2size, rows, cols, CV_8UC1);
             r2 = applySobelOperator(r2);
 
             r2send = matToIntArray(r2, r2size);
-            MPI_Send(&r2size, 1, MPI_INT, (rank - masters) / slaves_per_master, 1 , MPI_COMM_WORLD);
+            MPI_Send(&r2size, 1, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD);
             MPI_Send(r2send, r2size, MPI_INT, (rank - masters) / slaves_per_master, 1, MPI_COMM_WORLD);
             delete[] r2send;
         }
     }
 
-    if (rank == ROOT) {
+    if (rank == ROOT)
+    {
         clock_t end_t = clock();
         double durationSeconds = (double)(end_t - start_t) / CLOCKS_PER_SEC;
 
@@ -383,11 +409,15 @@ int main(int argc, char **argv)
 
     vidCapture.release();
     writer.release();
+    if (rank == ROOT)
+    {
+        demux.close();
+
+        system("ffmpeg -f concat -safe 0 -i edges/videos.txt -fflags +genpts edges/merged.mp4");
+    }
 
     MPI_Finalize();
-
 }
-
 
 // 0 1 2 3 4 5 6 7 8 9 10 11
 // 0 1 2 - masters
@@ -396,8 +426,7 @@ int main(int argc, char **argv)
 // 2 -> 9 10 11
 // RATIO = 4
 // no_slaves * (rank + 1)
-// 
-
+//
 
 // 0 1 2 3 4 5 6 7
 // RATIO 2

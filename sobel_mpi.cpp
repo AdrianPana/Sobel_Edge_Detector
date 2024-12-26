@@ -1,6 +1,7 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #include <time.h>
 #include <vector>
@@ -116,7 +117,7 @@ cv::Mat applySobelOperator(cv::Mat sourceImage)
         {1, 2, 1},
         {0, 0, 0},
         {-1, -2, -1}};
-    
+
     int r[3][3];
     int rows = sourceImage.rows;
     int cols = sourceImage.cols;
@@ -184,7 +185,7 @@ int main(int argc, char **argv)
     }
 
     MPI_Init(&argc, &argv);
- 
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &proc);
 
@@ -193,6 +194,7 @@ int main(int argc, char **argv)
     std::string videoName = fs_path.filename().string();
     std::string dirPath = fs_path.parent_path().parent_path().string();
     std::string outputVideoPath = dirPath + "/edges/edges_" + std::to_string(rank) + "_" + videoName;
+    std::ofstream demux;
 
     std::string blur = argv[2];
     bool BLUR = blur == "true";
@@ -217,6 +219,16 @@ int main(int argc, char **argv)
 
     writer = cv::VideoWriter(outputVideoPath, ex, frameRate, cv::Size(frameWidth, frameHeight), false);
     clock_t start_t = clock();
+    if (rank == ROOT)
+    {
+        demux.open( dirPath + "/edges/videos.txt");
+        for (int i = 0; i < proc; i++)
+        {
+            std::string temp = dirPath + "/edges/edges_" + std::to_string(i) + "_" + videoName;
+            int slashIndex = temp.find_last_of("/");
+            demux << "file " << temp.substr(slashIndex + 1) << std::endl;
+        }
+    }
 
     while (true)
     {
@@ -237,12 +249,14 @@ int main(int argc, char **argv)
         frames.push_back(frame);
     }
 
-    if (rank == ROOT) {
+    if (rank == ROOT)
+    {
         int len_frames = frames.size();
 
-        for (int i = 0; i < proc; ++i) {
+        for (int i = 0; i < proc; ++i)
+        {
             start = i * (double)len_frames / proc;
-            end = std::min((i + 1) * (double)len_frames / proc, (double)len_frames);    
+            end = std::min((i + 1) * (double)len_frames / proc, (double)len_frames);
 
             MPI_Send(&start, 1, MPI_LONG_LONG, i, 0, MPI_COMM_WORLD);
             MPI_Send(&end, 1, MPI_LONG_LONG, i, 0, MPI_COMM_WORLD);
@@ -252,11 +266,13 @@ int main(int argc, char **argv)
     MPI_Recv(&start, 1, MPI_LONG_LONG, ROOT, 0, MPI_COMM_WORLD, &status);
     MPI_Recv(&end, 1, MPI_LONG_LONG, ROOT, 0, MPI_COMM_WORLD, &status);
 
-    for (long long i = start; i < end; ++i) {
+    for (long long i = start; i < end; ++i)
+    {
         processFrame(frames[i], BLUR, writer);
-    }    
+    }
 
-    if (rank == ROOT) {
+    if (rank == ROOT)
+    {
         clock_t end_t = clock();
         double durationSeconds = (double)(end_t - start_t) / CLOCKS_PER_SEC;
 
@@ -266,7 +282,12 @@ int main(int argc, char **argv)
 
     vidCapture.release();
     writer.release();
+    if (rank == ROOT)
+    {
+        demux.close();
+
+        system("ffmpeg -f concat -safe 0 -i edges/videos.txt -fflags +genpts edges/merged.mp4");
+    }
 
     MPI_Finalize();
-
 }
