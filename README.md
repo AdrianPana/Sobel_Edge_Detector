@@ -11,13 +11,11 @@
 - #### C++ 17
 
 - #### OpenCV
-
-- #### Valgrind, Kcachegrind
 ```
 sudo apt-get install libopencv-dev
-sudo apt-get install valgrind
-sudo apt-get install kcachegrind
 ```
+- #### VTune
+
 # Usage
 Add images to the [images](./images/) folder
 ```
