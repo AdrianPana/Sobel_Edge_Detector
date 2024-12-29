@@ -17,10 +17,10 @@ sudo apt-get install libopencv-dev
 - #### VTune
 
 # Usage
-Add images to the [images](./images/) folder
+Add images to the [images](./images/) folder or videos or the [videos](./videos/) folder
 ```
 make build
-make run IMAGE=./images/image.jpg BLUR=true/false
+make run IMAGE=./images\videos/file BLUR=true/false
 make profile IMAGE=./images/image.jpg BLUR=true/false
 ```
 Find the result in the [edges](./edges/) folder
